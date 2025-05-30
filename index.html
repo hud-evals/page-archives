@@ -63,19 +63,17 @@
             const urlParams = new URLSearchParams(window.location.search);
             const isDebugMode = urlParams.get('debug') === 'true';
 
-            if (!isDebugMode) {
-                replayElement.setAttribute('embed', 'replayonly');
-            } else {
-                // Optionally, if in debug mode, make sure the message area isn't fully hidden by body/html overflow:hidden if replay-web-page is smaller
-                // For now, we assume replay-web-page will still be large enough or debug user can inspect/adjust.
-                // Or adjust styles for replay-web-page if debug mode needs specific layout.
-                console.log('Debug mode active: replayweb.page UI will be shown.');
+            // Determine base path for GitHub Pages deployment
+            let basePath = '';
+            if (window.location.hostname.endsWith('.github.io')) {
+                const pathSegments = window.location.pathname.split('/').filter(part => part !== '');
+                if (pathSegments.length > 0) {
+                    basePath = '/' + pathSegments[0]; // Assumes repo name is the first segment
+                }
             }
 
-            const pathParts = window.location.pathname.split('/').filter(part => part !== '');
-            // If path is like /archive-name or /archive-name/ or /archive-name/index.html
-            // The last significant part before an optional 'index.html' is the archive name.
-            // If the path is just '/' or '/index.html', there's no archive name in the path.
+            const pathParts = window.location.pathname.substring(basePath.length).split('/').filter(part => part !== '');
+
             let archiveNameFromPath = null;
             if (pathParts.length > 0) {
                 let lastPart = pathParts[pathParts.length - 1];
@@ -119,11 +117,12 @@
             }
 
             if (archiveNameFromUrl) {
-                const archiveSource = `/archives/${archiveNameFromUrl}.wacz`; // Path is now relative to root for Express
+                // Construct archiveSource relative to the *assumed* deployment structure on GH Pages or local server
+                const archiveSource = `${basePath}/archives/${archiveNameFromUrl}.wacz`;
                 if (startPageFromUrl) {
                     loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl);
                 } else {
-                    fetch('/archives/archive_list.json') // Path is now relative to root
+                    fetch(`${basePath}/archives/archive_list.json`)
                         .then(response => {
                             if (!response.ok) throw new Error('archive_list.json not found or not accessible when looking for startPage.');
                             return response.json();
@@ -145,12 +144,12 @@
                 replayElement.style.display = 'none';
                 messageElement.innerHTML = `
                     <h1>Web Archive Viewer</h1>
-                    <p>Welcome! Please select an archive to view from the list below, or visit /archive-name directly.</p>
-                    <p>For example: <a href="/example1">/example1</a> or <a href="/example1?page=https://example.com/">/example1?page=https://example.com/</a></p>
+                    <p>Welcome! Please select an archive to view from the list below, or visit ${basePath}/archive-name directly.</p>
+                    <p>For example: <a href="${basePath}/example1">${basePath}/example1</a> or <a href="${basePath}/example1?page=https://example.com/">${basePath}/example1?page=https://example.com/</a></p>
                     <p><em>Attempting to list available archives...</em></p>
                 `;
 
-                fetch('/archives/archive_list.json') // Path is now relative to root
+                fetch(`${basePath}/archives/archive_list.json`)
                     .then(response => {
                         if (!response.ok) {
                             throw new Error('archive_list.json not found or not accessible.');
@@ -162,11 +161,7 @@
                         if (data && data.archives && data.archives.length > 0) {
                             listHtml = '<h2>Available Archives:</h2><ul>';
                             data.archives.forEach(archive => {
-                                // Links will now be path-based
-                                let link = `/${archive.name}`;
-                                if (startPageFromUrl && archive.name === archiveNameFromUrl) { // Keep page param if it was for current context
-                                    link += `?page=${encodeURIComponent(startPageFromUrl)}`;
-                                }
+                                let link = `${basePath}/${archive.name}`;
                                 listHtml += `<li><a href="${link}">${archive.displayName || archive.name}</a></li>`;
                             });
                             listHtml += '</ul>';
@@ -175,8 +170,8 @@
                         }
                         messageElement.innerHTML = `
                             <h1>Web Archive Viewer</h1>
-                            <p>Welcome! Please select an archive to view from the list below, or visit /archive-name directly.</p>
-                            <p>For example: <a href="/example1">/example1</a> or <a href="/example1?page=https://example.com/">/example1?page=https://example.com/</a></p>
+                            <p>Welcome! Please select an archive to view from the list below, or visit ${basePath}/archive-name directly.</p>
+                            <p>For example: <a href="${basePath}/example1">${basePath}/example1</a> or <a href="${basePath}/example1?page=https://example.com/">${basePath}/example1?page=https://example.com/</a></p>
                             ${listHtml}
                             <p><br />You can define a default start page for each archive in 'archives/archive_list.json' using the "startPage" property.</p>
                         `;
@@ -185,8 +180,8 @@
                         console.warn(error.message);
                         messageElement.innerHTML = `
                             <h1>Web Archive Viewer</h1>
-                            <p>Welcome! Please select an archive to view or visit /archive-name directly.</p>
-                            <p>For example: <a href="/example1">/example1</a></p>
+                            <p>Welcome! Please select an archive to view or visit ${basePath}/archive-name directly.</p>
+                            <p>For example: <a href="${basePath}/example1">${basePath}/example1</a></p>
                             <p><em>Attempting to list available archives...</em></p>
                             <p style="color: red;">Could not load archive list: ${error.message}</p>
                             <p>You can create an 'archives/archive_list.json' file to list your archives. It should look like: <pre>{"archives": [ {"name": "archive1", "displayName": "My First Archive", "startPage": "https://default.page.com"}]}</pre></p>
