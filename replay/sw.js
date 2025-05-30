@@ -1,0 +1,1 @@
+importScripts("../node_modules/replaywebpage/sw.js"); 

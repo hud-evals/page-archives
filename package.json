@@ -1,0 +1,28 @@
+{
+  "name": "page-archives",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev": "node server.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hud-evals/page-archives.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/hud-evals/page-archives/issues"
+  },
+  "homepage": "https://github.com/hud-evals/page-archives#readme",
+  "dependencies": {
+    "express": "^5.1.0",
+    "replaywebpage": "^2.3.11"
+  },
+  "devDependencies": {
+    "http-server": "^14.1.1"
+  }
+}

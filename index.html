@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Web Archive Viewer</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            font-family: sans-serif;
+            overflow: hidden;
+        }
+        replay-web-page {
+            width: 100vw;
+            height: 100vh;
+            border: none;
+            display: block;
+        }
+        #archive-container {
+            width: 100%;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        #message {
+            padding: 0px;
+            text-align: center;
+        }
+        ul#archive-list {
+            list-style: none;
+            padding: 0;
+        }
+        ul#archive-list li {
+            margin: 5px 0;
+        }
+    </style>
+</head>
+<body>
+    <div id="archive-container">
+        <div id="message">
+            <h1>Web Archive Viewer</h1>
+            <p>Loading archive...</p>
+            <p>If nothing loads, please ensure you have specified an archive using the '?name=' URL parameter (e.g., index.html?name=mytestarchive), and that the file 'archives/mytestarchive.wacz' exists.</p>
+            <p>Available archives (assuming files exist in the 'archives' folder and end with '.wacz'):</p>
+            <ul id="archive-list">
+                <!-- Example: <li><a href="?name=example1">example1</a></li> -->
+            </ul>
+        </div>
+        <replay-web-page id="replay_iframe"></replay-web-page>
+    </div>
+
+    <script async src="./node_modules/replaywebpage/ui.js"></script>
+    <script>
+        document.addEventListener('DOMContentLoaded', () => {
+            const replayElement = document.getElementById('replay_iframe');
+            const messageElement = document.getElementById('message');
+
+            const urlParams = new URLSearchParams(window.location.search);
+            const isDebugMode = urlParams.get('debug') === 'true';
+
+            if (!isDebugMode) {
+                replayElement.setAttribute('embed', 'replayonly');
+            } else {
+                // Optionally, if in debug mode, make sure the message area isn't fully hidden by body/html overflow:hidden if replay-web-page is smaller
+                // For now, we assume replay-web-page will still be large enough or debug user can inspect/adjust.
+                // Or adjust styles for replay-web-page if debug mode needs specific layout.
+                console.log('Debug mode active: replayweb.page UI will be shown.');
+            }
+
+            const pathParts = window.location.pathname.split('/').filter(part => part !== '');
+            // If path is like /archive-name or /archive-name/ or /archive-name/index.html
+            // The last significant part before an optional 'index.html' is the archive name.
+            // If the path is just '/' or '/index.html', there's no archive name in the path.
+            let archiveNameFromPath = null;
+            if (pathParts.length > 0) {
+                let lastPart = pathParts[pathParts.length - 1];
+                if (lastPart.toLowerCase() === 'index.html' && pathParts.length > 1) {
+                    archiveNameFromPath = pathParts[pathParts.length - 2];
+                } else if (lastPart.toLowerCase() !== 'index.html') {
+                    archiveNameFromPath = lastPart;
+                }
+            }
+            // Fallback or precedence: query parameter `name` can still be used if needed for specific links, but path is primary
+            const archiveNameFromQuery = urlParams.get('name');
+            const archiveNameFromUrl = archiveNameFromPath || archiveNameFromQuery;
+
+            const startPageFromUrl = urlParams.get('page');
+
+            function loadArchive(archiveName, sourceUrl, pageToLoad) {
+                replayElement.setAttribute('source', sourceUrl);
+                if (pageToLoad) {
+                    replayElement.setAttribute('url', pageToLoad);
+                }
+                messageElement.style.display = 'none';
+                replayElement.style.display = 'block';
+                console.log(`Attempting to load: ${sourceUrl}, start page: ${pageToLoad || 'archive default'}`);
+
+                fetch(sourceUrl, { method: 'HEAD' })
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error(`Could not find or access archive: ${archiveName}.wacz (HTTP ${response.status})`);
+                        }
+                    })
+                    .catch(err => {
+                        replayElement.style.display = 'none';
+                        messageElement.style.display = 'block';
+                        messageElement.innerHTML = `
+                            <h1>Error</h1>
+                            <p>Failed to load archive: <strong>${archiveName}.wacz</strong></p>
+                            <p>${err.message}</p>
+                            <p><a href="${window.location.pathname}">Back to archive list</a></p>
+                        `;
+                    });
+            }
+
+            if (archiveNameFromUrl) {
+                const archiveSource = `/archives/${archiveNameFromUrl}.wacz`; // Path is now relative to root for Express
+                if (startPageFromUrl) {
+                    loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl);
+                } else {
+                    fetch('/archives/archive_list.json') // Path is now relative to root
+                        .then(response => {
+                            if (!response.ok) throw new Error('archive_list.json not found or not accessible when looking for startPage.');
+                            return response.json();
+                        })
+                        .then(data => {
+                            let archiveData = null;
+                            if (data && data.archives) {
+                                archiveData = data.archives.find(a => a.name === archiveNameFromUrl);
+                            }
+                            const pageToLoad = startPageFromUrl || (archiveData && archiveData.startPage ? archiveData.startPage : null);
+                            loadArchive(archiveNameFromUrl, archiveSource, pageToLoad);
+                        })
+                        .catch(error => {
+                            console.warn(`Error fetching or processing archive_list.json for startPage: ${error.message}. Loading archive without a specific start page.`);
+                            loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl); // Still pass startPageFromUrl if it was present
+                        });
+                }
+            } else {
+                replayElement.style.display = 'none';
+                messageElement.innerHTML = `
+                    <h1>Web Archive Viewer</h1>
+                    <p>Welcome! Please select an archive to view from the list below, or visit /archive-name directly.</p>
+                    <p>For example: <a href="/example1">/example1</a> or <a href="/example1?page=https://example.com/">/example1?page=https://example.com/</a></p>
+                    <p><em>Attempting to list available archives...</em></p>
+                `;
+
+                fetch('/archives/archive_list.json') // Path is now relative to root
+                    .then(response => {
+                        if (!response.ok) {
+                            throw new Error('archive_list.json not found or not accessible.');
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        let listHtml = '';
+                        if (data && data.archives && data.archives.length > 0) {
+                            listHtml = '<h2>Available Archives:</h2><ul>';
+                            data.archives.forEach(archive => {
+                                // Links will now be path-based
+                                let link = `/${archive.name}`;
+                                if (startPageFromUrl && archive.name === archiveNameFromUrl) { // Keep page param if it was for current context
+                                    link += `?page=${encodeURIComponent(startPageFromUrl)}`;
+                                }
+                                listHtml += `<li><a href="${link}">${archive.displayName || archive.name}</a></li>`;
+                            });
+                            listHtml += '</ul>';
+                        } else {
+                            listHtml = '<p>No archives listed in archive_list.json or the file is empty.</p>';
+                        }
+                        messageElement.innerHTML = `
+                            <h1>Web Archive Viewer</h1>
+                            <p>Welcome! Please select an archive to view from the list below, or visit /archive-name directly.</p>
+                            <p>For example: <a href="/example1">/example1</a> or <a href="/example1?page=https://example.com/">/example1?page=https://example.com/</a></p>
+                            ${listHtml}
+                            <p><br />You can define a default start page for each archive in 'archives/archive_list.json' using the "startPage" property.</p>
+                        `;
+                    })
+                    .catch(error => {
+                        console.warn(error.message);
+                        messageElement.innerHTML = `
+                            <h1>Web Archive Viewer</h1>
+                            <p>Welcome! Please select an archive to view or visit /archive-name directly.</p>
+                            <p>For example: <a href="/example1">/example1</a></p>
+                            <p><em>Attempting to list available archives...</em></p>
+                            <p style="color: red;">Could not load archive list: ${error.message}</p>
+                            <p>You can create an 'archives/archive_list.json' file to list your archives. It should look like: <pre>{"archives": [ {"name": "archive1", "displayName": "My First Archive", "startPage": "https://default.page.com"}]}</pre></p>
+                        `;
+                    });
+            }
+        });
+    </script>
+</body>
+</html> 
