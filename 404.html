@@ -51,7 +51,7 @@
                 <!-- Example: <li><a href="?name=example1">example1</a></li> -->
             </ul>
         </div>
-        <replay-web-page id="replay_iframe"></replay-web-page>
+        <replay-web-page id="replay_iframe" embed="replayonly"></replay-web-page>
     </div>
 
     <script async src="./node_modules/replaywebpage/ui.js"></script>
@@ -62,6 +62,13 @@
 
             const urlParams = new URLSearchParams(window.location.search);
             const isDebugMode = urlParams.get('debug') === 'true';
+
+            // replay_iframe defaults to embed="replayonly" in HTML.
+            // Only remove it if debug mode is active.
+            if (isDebugMode) {
+                replayElement.removeAttribute('embed');
+                console.log('Debug mode active: replayweb.page UI will be shown.');
+            }
 
             // Determine base path for GitHub Pages deployment
             let basePath = '';
