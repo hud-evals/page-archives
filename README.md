@@ -13,11 +13,7 @@ This project provides a simple web application to view WACZ (Web ARChiveZip) fil
 
 ## Using Archives with the HUD SDK
 
-Web archives provide consistent, offline-first environments for testing web-based agents. Once this `page-archives` repository is deployed to GitHub Pages (see [GitHub Pages Deployment](#github-pages-deployment) section below), the archived sites become accessible via stable URLs.
-
-You can then use these URLs in your `hud-sdk` tasks. For example, if you have an archive named `my-test-site` deployed here, it might be accessible at `https://hud-evals.github.io/page-archives/my-test-site`. If this archive contains a page `https://originalsite.com/login.html`, its archived version would be loaded by `replayweb.page` at that URL.
-
-Here's how you might use it in a `hud.Task`:
+Web archives provide consistent, offline-first environments for testing web-based agents. For example, if you have an archive named `my-test-site` deployed here, it will be accessible at `https://hud-evals.github.io/page-archives/my-test-site`. Here's how you might use it in a `hud.Task`:
 
 ```python
 from hud.task import Task
@@ -26,12 +22,10 @@ login_task = Task(
     prompt="Log into the website using username 'testuser' and password 'password123'.",
     gym="hud-browser", # Or your relevant browser-based gym
     setup=(
-        "goto", 
-        "https://hud-evals.github.io/page-archives/my-test-site
+        "goto", "https://hud-evals.github.io/page-archives/my-test-site"
     ),
     evaluate=(
-        "page_contains", 
-        "Welcome, testuser!"
+        "page_contains", "Welcome, testuser!"
     )
 )
 
