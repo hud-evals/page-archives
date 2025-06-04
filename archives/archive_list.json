@@ -9,6 +9,11 @@
 	    "name": "codeforces-archive-small",
 	    "displayName": "Codeforces Archive (Small)",
 	    "startPage": "https://codeforces.com/"
+	},
+	{
+	    "name": "codefun-archive-small",
+	    "displayName": "CodeFun Archive (Small)",
+	    "startPage": "https://codefun.vn/"
 	}
     ]
 } 
