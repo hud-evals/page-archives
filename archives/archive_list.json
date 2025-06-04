@@ -4,6 +4,11 @@
             "name": "doordash-archive-small-1",
             "displayName": "DoorDash Archive (Small 1)",
             "startPage": "https://www.doordash.com/"
-        }
+        },
+	{
+	    "name": "codeforces-archive-small",
+	    "displayName": "Codeforces Archive (Small)",
+	    "startPage": "https://codeforces.com/"
+	}
     ]
 } 
