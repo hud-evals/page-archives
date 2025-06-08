@@ -22,29 +22,33 @@ app.get('/index.html', (req, res) => {
 });
 
 // Handle requests that could be archive names
-app.get('/:archiveName', (req, res, next) => {
-    const potentialArchivePath = path.join(archivesDir, req.params.archiveName + '.wacz');
-    const potentialArchiveNameOnly = req.params.archiveName;
+const handleArchiveRequest = (req, res, next) => {
+    const archiveName = req.params.archiveName;
 
-    // Check if it might be a request for a static file in the root (e.g., favicon.ico, manifest.json)
-    // You might want to expand this list or use a more robust static file serving for the root if needed.
-    if (potentialArchiveNameOnly.includes('.')) { // Simple check for file extension
-        const rootFilePath = path.join(__dirname, potentialArchiveNameOnly);
+    // Exclude known static directories from being treated as archives.
+    // The express.static middleware runs first, but this is a safeguard for root requests.
+    if (['node_modules', 'archives', 'replay'].includes(archiveName)) {
+        return next();
+    }
+
+    // If the request is for a file with an extension, it's likely a static asset.
+    // Let's check if it exists in the root directory (e.g., favicon.ico).
+    if (archiveName.includes('.')) {
+        const rootFilePath = path.join(__dirname, archiveName);
         if (fs.existsSync(rootFilePath)) {
             return res.sendFile(rootFilePath);
         }
+        // If a file with an extension is not found, it's a 404.
+        return next();
     }
 
-    // Heuristic: If it doesn't have an extension and a WACZ file with that name exists, serve index.html
-    // Or, if it's a known archive from a list (if we were to read archive_list.json server-side)
-    // For now, we'll rely on the WACZ file existing for simplicity.
-    if (fs.existsSync(potentialArchivePath)) {
-        res.sendFile(path.join(__dirname, 'index.html'));
-    } else {
-        // If it's not an existing WACZ and not explicitly handled, pass to 404 handler
-        next();
-    }
-});
+    // For any other path, assume it's an archive request and serve the main app.
+    // The client-side logic in index.html will handle fetching from the API or local fallback.
+    return res.sendFile(path.join(__dirname, 'index.html'));
+};
+
+app.get('/:archiveName', handleArchiveRequest);
+app.get('/page-archives/:archiveName', handleArchiveRequest);
 
 app.listen(port, () => {
     console.log(`Server running at http://localhost:${port}`);

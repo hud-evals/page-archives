@@ -124,29 +124,67 @@
             }
 
             if (archiveNameFromUrl) {
-                // Construct archiveSource relative to the *assumed* deployment structure on GH Pages or local server
-                const archiveSource = `${basePath}/archives/${archiveNameFromUrl}.wacz`;
-                if (startPageFromUrl) {
-                    loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl);
-                } else {
-                    fetch(`${basePath}/archives/archive_list.json`)
-                        .then(response => {
-                            if (!response.ok) throw new Error('archive_list.json not found or not accessible when looking for startPage.');
-                            return response.json();
-                        })
-                        .then(data => {
-                            let archiveData = null;
-                            if (data && data.archives) {
-                                archiveData = data.archives.find(a => a.name === archiveNameFromUrl);
+                // This logic now applies to ANY archive name found in the URL.
+                // It will first attempt to load from the community environments API.
+                let BASE_URL = "http://localhost:8000"//"https://api.hud.so"
+                fetch(`${BASE_URL}/data/community-environments/${archiveNameFromUrl}`)
+                    .then(response => {
+                        if (!response.ok) {
+                            // If the API fails, we can fallback to the old logic for non-UUIDs.
+                            const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+                            if (!uuidRegex.test(archiveNameFromUrl)) {
+                                console.warn(`API lookup failed for '${archiveNameFromUrl}', falling back to local archives.`);
+                                return Promise.reject(new Error('Fallback to local'));
+                            } else {
+                                throw new Error(`Could not find community environment: ${archiveNameFromUrl} (HTTP ${response.status})`);
                             }
-                            const pageToLoad = startPageFromUrl || (archiveData && archiveData.startPage ? archiveData.startPage : null);
-                            loadArchive(archiveNameFromUrl, archiveSource, pageToLoad);
-                        })
-                        .catch(error => {
-                            console.warn(`Error fetching or processing archive_list.json for startPage: ${error.message}. Loading archive without a specific start page.`);
-                            loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl); // Still pass startPageFromUrl if it was present
-                        });
-                }
+                        }
+                        return response.json();
+                    })
+                    .then(data => {
+                        if (!data || !data.source) {
+                            throw new Error(`Invalid data received from community environment API for: ${archiveNameFromUrl}`);
+                        }
+                        const archiveSource = data.source;
+                        const metadata = data.metadata || {};
+                        console.log(metadata);
+                        const pageToLoad = startPageFromUrl || metadata.start_page || null;
+                        const displayName = metadata.displayName || archiveNameFromUrl;
+                        loadArchive(displayName, archiveSource, pageToLoad);
+                    })
+                    .catch(err => {
+                        // This catch block handles both API errors and the deliberate fallback.
+                        if (err.message === 'Fallback to local') {
+                            const archiveSource = `${basePath}/archives/${archiveNameFromUrl}.wacz`;
+                             if (startPageFromUrl) {
+                                loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl);
+                            } else {
+                                fetch(`${basePath}/archives/archive_list.json`)
+                                    .then(response => {
+                                        if (!response.ok) throw new Error('archive_list.json not found or not accessible when looking for startPage.');
+                                        return response.json();
+                                    })
+                                    .then(data => {
+                                        const archiveData = data && data.archives ? data.archives.find(a => a.name === archiveNameFromUrl) : null;
+                                        const pageToLoad = startPageFromUrl || (archiveData && archiveData.startPage ? archiveData.startPage : null);
+                                        loadArchive(archiveNameFromUrl, archiveSource, pageToLoad);
+                                    })
+                                    .catch(error => {
+                                        console.warn(`Error fetching or processing archive_list.json for startPage: ${error.message}. Loading archive without a specific start page.`);
+                                        loadArchive(archiveNameFromUrl, archiveSource, startPageFromUrl);
+                                    });
+                            }
+                        } else {
+                             replayElement.style.display = 'none';
+                            messageElement.style.display = 'block';
+                            messageElement.innerHTML = `
+                                <h1>Error</h1>
+                                <p>Failed to load archive: <strong>${archiveNameFromUrl}</strong></p>
+                                <p>${err.message}</p>
+                                <p><a href="${window.location.origin}">Back to home</a></p>
+                            `;
+                        }
+                    });
             } else {
                 replayElement.style.display = 'none';
                 messageElement.innerHTML = `
